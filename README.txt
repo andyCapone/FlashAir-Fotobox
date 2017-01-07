@@ -45,6 +45,7 @@ Version History:
     0.2.1
         - Starter wird erstellt
         - sauberen Shutdown der Threads vorbereitet
+
 	0.2
 		Konfigurationsmöglichkeiten hinzugefügt:
 		- Kameraordner
