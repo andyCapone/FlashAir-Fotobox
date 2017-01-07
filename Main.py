@@ -6,7 +6,9 @@ from threading import Thread, Lock
 from urllib import urlopen
 from datetime import datetime, timedelta
 from os.path import realpath, dirname, isdir
-from os import devnull, mkdir
+from os import devnull, mkdir, chmod
+from stat import S_IRWXU, S_IRGRP
+from sys import argv, exit
 from errno import EEXIST
 from subprocess import call
 from time import sleep
@@ -17,6 +19,26 @@ from PIL import ImageTk as PIL_ImageTk, Image as PIL_Image
 
 PATH = dirname(realpath(__file__)) + "/"
 LOCK = Lock()
+
+
+def desktop():
+    s = """[Desktop Entry]
+Type=Application
+Name=FlashAir-Fotobox
+Exec={0}Main.py
+Icon={0}fotobox.ico
+Terminal=false""".format(PATH)
+    p = PATH + "Fotobox.desktop"
+    try:
+        with open(p, "w") as f:
+            f.write(s)
+    except IOError:
+        return False
+    except:
+        raise
+    else:
+        chmod(p, S_IRWXU | S_IRGRP)
+    return True
 
 
 class SettingsWindow(object):
@@ -223,11 +245,13 @@ class ImageLoader(Thread):
     def run(self):
         while not self.quit:
             pics = Foto.alleLaden(orderBy="zeigDatum")
+            end = datetime.today() + timedelta(seconds=self.settings.anzeigedauerSek)
             if pics:
                 self.viewer.displayImage(pics[0].lokalPfad)
                 pics[0].zeigDatum = datetime.today()
                 pics[0].speichern()
-            sleep(self.settings.anzeigedauerSek)
+            while (datetime.today() < end) and not self.quit:
+                sleep(.01)
 
 
 class ImageViewer(object):
@@ -285,6 +309,8 @@ class Main(object):
     def __init__(self):
         SettingsWindow()
         self.settings = Einstellungen.get()
+        if self.settings.init:
+            desktop()
         Syncer.syncFotoDateien(self.settings.lokalOrdner)
         self.syncer = Syncer(self.settings)
         self.syncer.start()
@@ -298,4 +324,11 @@ class Main(object):
 
 
 if __name__ == "__main__":
-    Main()
+    if len(argv) == 1:
+        Main()
+    elif len(argv) == 2:
+        if argv[1] == "desktop":
+            if desktop():
+                exit(0)
+            else:
+                exit(1)
