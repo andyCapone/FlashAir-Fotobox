@@ -1,10 +1,33 @@
 # coding:utf-8
 
 from Daten import Datentyp
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 from subprocess import call
-from os.path import basename
+from os.path import basename, dirname, realpath
 from urllib import urlopen
+
+
+class Einstellungen(Datentyp):
+    SQLITE_TBL = "einstellungen"
+
+    def standard(self):
+        self.remoteOrdner = "/DCIM"
+        self.lokalOrdner = dirname(realpath(__file__))
+        self.anzeigedauerSek = 10
+        self.downloadVerzoegerungMin = 2
+        self.init = True
+        return self
+
+    @staticmethod
+    def get():
+        einst = Einstellungen.alleLaden()
+        if not einst:
+            return Einstellungen().standard()
+        return einst[0]
+
+    def speichern(self, dbDatei=None):
+        self.init = False
+        super(Einstellungen, self).speichern(dbDatei)
 
 
 class Foto(Datentyp):
