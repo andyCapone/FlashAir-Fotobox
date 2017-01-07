@@ -1,10 +1,10 @@
 # coding:utf-8
 
 from Daten import Datentyp
-from datetime import date, time, datetime, timedelta
+from datetime import date, time, datetime
 from subprocess import call
 from os.path import basename, dirname, realpath
-from urllib import urlopen
+from urllib2 import urlopen
 
 
 class Einstellungen(Datentyp):
@@ -14,7 +14,8 @@ class Einstellungen(Datentyp):
         self.remoteOrdner = "/DCIM"
         self.lokalOrdner = dirname(realpath(__file__))
         self.anzeigedauerSek = 10
-        self.downloadVerzoegerungMin = 2
+        self.downloadVerzoegerungMin = 0
+        self.logging = True
         self.init = True
         return self
 
@@ -38,12 +39,12 @@ class Foto(Datentyp):
     IND_ATR = 3
     IND_DAT = 4
     IND_TIM = 5
+    SUPPORTED = {"jpeg", "png", "bmp"}
 
     def getFoto(self, aufnDatum, size, remoteRoot, remotePfad, istRemote, lokalPfad=""):
         self.aufnDatum = aufnDatum
         self.zeigDatum = datetime(1900, 1, 1)
         self.size = size
-        self.remoteOhneRoot = remotePfad
         self.remotePfad = remoteRoot + remotePfad
         self.lokalPfad = lokalPfad
         self.istRemote = istRemote
@@ -67,7 +68,7 @@ class Foto(Datentyp):
                         laufindex += 1
                 try:
                     with open(lokalPfad, "wb") as f:
-                        f.write(urlopen(self.remotePfad).read())
+                        f.write(urlopen(self.remotePfad, timeout=5).read())
                 except:
                     return False
                 else:
@@ -77,6 +78,13 @@ class Foto(Datentyp):
 
     def getIdentifier(self):
         return "{0}_{1}".format(self.aufnDatum.strftime("%Y%m%d-%H%M%S"), self.remotePfad)
+
+    def getRemoteOhneRoot(self, camUrl):
+        return self.remotePfad.split(camUrl)[-1]
+
+    @staticmethod
+    def ladeOhneRemote():
+        return Foto.bedingtLaden("remotePfad=?", "")
 
     @staticmethod
     def ladeAlleIdentifier():
@@ -112,6 +120,12 @@ class Foto(Datentyp):
         aufnDatum = Foto.konvDatum(int(l[Foto.IND_DAT]), int(l[Foto.IND_TIM]))
         size = int(l[Foto.IND_SIZ])
         return Foto().getFoto(aufnDatum, size, remoteRootPfad, fotoPfad, True)
+
+    @staticmethod
+    def konvertiereLokal(stat, pfad):
+        aufnDatum = datetime.fromtimestamp(stat.st_ctime)
+        size = int(stat.st_size)
+        return Foto().getFoto(aufnDatum, size, "", "", False, pfad)
 
     @staticmethod
     def konvDatum(rawDatum, rawZeit):

@@ -1,7 +1,7 @@
-Fotobox Version 0.2.1
+Fotobox Version 0.4
 
 Funktion:
-	- lädt bei bestehender Verbindung zu flashair Fotos im 
+	- lädt bei bestehender Verbindung zu flashair Fotos vom
 	  definierten Remoteordner herunter und löscht sie auf flashair
 	- zeigt die Bilder in einem lokalen Fenster an
 	- die Reihenfolge der Anzeige wird bestimmt durch das letzte
@@ -9,6 +9,9 @@ Funktion:
 	  möglichst bald angezeigt und dann hinten angereiht)
 	- anpassbare Anzeigedauer
 	- anpassbare Verzögerung, bevor Fotos heruntergeladen werden
+	- Fotos können in den FotoboxBilder-Ordner kopiert werden, um in
+	  die Diashow eingebunden zu werden; es ist auf diese Weise eine
+	  reine Diashow möglich
 	- F11 aktiviert/ deaktiviert den Vollbildmodus
 	- Esc deaktiviert den Vollbildmodus
 	
@@ -27,7 +30,7 @@ Vorbereitungen:
 	  deaktivieren (evtl. aktivieren und wieder deaktivieren)
 	- (!) immer darauf achten, dass neue Fotos nicht schreibgeschützt
 	      gespeichert werden und dass sie in den Ordner gespeichert 
-	      werden, der im Programm definiert wurde
+	      werden, der im Setup definiert wurde
 	- erster Start: Terminal öffnen, in den FlashAir-Fotobox-Ordner
 	  wechseln und die Main.py ausführen. Es wird dann ein Starter
 	  "FlashAir-Fotobox" erstellt, der auf den Schreibtisch oder an
@@ -36,19 +39,26 @@ Vorbereitungen:
 	
 	
 TODO:
-	- Verbindung "sichern": pairing
-	- (de)aktivierbare Eventanzeige / Log
-	- Überprüfen des lokalen Ordners auf Dateien und Ermöglichen
-	  einer reinen Diashow-Funktion
+	- Verbindung "sichern": pairing ?
+	- sich für eine Sprache entscheiden :-)
+	- Diashow-Modus ohne Pingen der FlashAir
+
 
 Version History:
+    0.4
+        - Logging
+        - Icon
+        - es wird versucht, die Threads sauber zu beenden (max 5s)
+        - Exceptionhandling
+        - Fotos, die auf der FlashAir nach Löschen wieder auftauchen, können
+          wiedererkannt werden
+        - diverse kleine Umstrukturierungen
     0.2.1
         - Starter wird erstellt
         - sauberen Shutdown der Threads vorbereitet
-
 	0.2
-		Konfigurationsmöglichkeiten hinzugefügt:
-		- Kameraordner
-		- Downloadordner
-		- Anzeigedauer
-		- Downloadverzögerung
+		- Konfigurationsmöglichkeiten hinzugefügt:
+		    - Kameraordner
+		    - Downloadordner
+		    - Anzeigedauer
+		    - Downloadverzögerung
