@@ -1,4 +1,4 @@
-Fotobox Version 0.2
+Fotobox Version 0.2.1
 
 Funktion:
 	- lädt bei bestehender Verbindung zu flashair Fotos im 
@@ -28,6 +28,11 @@ Vorbereitungen:
 	- (!) immer darauf achten, dass neue Fotos nicht schreibgeschützt
 	      gespeichert werden und dass sie in den Ordner gespeichert 
 	      werden, der im Programm definiert wurde
+	- erster Start: Terminal öffnen, in den FlashAir-Fotobox-Ordner
+	  wechseln und die Main.py ausführen. Es wird dann ein Starter
+	  "FlashAir-Fotobox" erstellt, der auf den Schreibtisch oder an
+	  einen anderen Ort kopiert werden kann. Ein Doppelklick auf
+	  den Starter führt dann zukünftig das Programm aus.
 	
 	
 TODO:
@@ -37,6 +42,9 @@ TODO:
 	  einer reinen Diashow-Funktion
 
 Version History:
+    0.2.1
+        - Starter wird erstellt
+        - sauberen Shutdown der Threads vorbereitet
 	0.2
 		Konfigurationsmöglichkeiten hinzugefügt:
 		- Kameraordner
