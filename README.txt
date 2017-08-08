@@ -41,10 +41,15 @@ Vorbereitungen:
 TODO:
 	- Verbindung "sichern": pairing ?
 	- sich für eine Sprache entscheiden :-)
-	- Diashow-Modus ohne Pingen der FlashAir
+	- Diashow-Modus ohne Pingen der FlashAir bzw. Testen der USB-Verbindung
+	- Debugging der USB-Verbindung:
+	    - erkennen von Fotos, die vorher per Wifi heruntergeladen wurden und durch den Flashairbug nicht
+	      gelöscht werden konnten
 
 
 Version History:
+    0.5
+        - USB-Verbindung zur Kamera möglich (Beta)
     0.4
         - Logging
         - Icon

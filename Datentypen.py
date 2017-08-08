@@ -4,6 +4,8 @@ from Daten import Datentyp
 from datetime import date, time, datetime
 from subprocess import call
 from os.path import basename, dirname, realpath
+from os import stat
+from shutil import copy2 as copy
 from urllib2 import urlopen
 
 
@@ -17,6 +19,7 @@ class Einstellungen(Datentyp):
         self.downloadVerzoegerungMin = 0
         self.logging = True
         self.init = True
+        self.verbindungsart = "Wifi"
         return self
 
     @staticmethod
@@ -50,7 +53,7 @@ class Foto(Datentyp):
         self.istRemote = istRemote
         return self
 
-    def download(self, dir):
+    def download(self, dir, kind="wifi"):
         if self.istRemote:
             if not call(["mkdir", "-p", dir]):
                 lokalPfad = self.__getLokalPfad(dir)
@@ -67,8 +70,11 @@ class Foto(Datentyp):
                     else:
                         laufindex += 1
                 try:
-                    with open(lokalPfad, "wb") as f:
-                        f.write(urlopen(self.remotePfad, timeout=5).read())
+                    if kind == "wifi":
+                        with open(lokalPfad, "wb") as f:
+                            f.write(urlopen(self.remotePfad, timeout=5).read())
+                    elif kind == "usb":
+                        copy(self.remotePfad, lokalPfad)
                 except:
                     return False
                 else:
@@ -122,9 +128,17 @@ class Foto(Datentyp):
         return Foto().getFoto(aufnDatum, size, remoteRootPfad, fotoPfad, True)
 
     @staticmethod
-    def konvertiereLokal(stat, pfad):
-        aufnDatum = datetime.fromtimestamp(stat.st_ctime)
-        size = int(stat.st_size)
+    def konvertiereUSBRemote(remotePfad):
+        s = stat(remotePfad)
+        aufnDatum = datetime.utcfromtimestamp(s.st_ctime)
+        size = int(s.st_size)
+        return Foto().getFoto(aufnDatum, size, "", remotePfad, True)
+
+    @staticmethod
+    def konvertiereLokal(pfad):
+        s = stat(pfad)
+        aufnDatum = datetime.fromtimestamp(s.st_ctime)
+        size = int(s.st_size)
         return Foto().getFoto(aufnDatum, size, "", "", False, pfad)
 
     @staticmethod

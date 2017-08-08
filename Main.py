@@ -6,7 +6,7 @@ from threading import Thread, Lock
 from urllib2 import urlopen
 from datetime import datetime, timedelta
 from os.path import realpath, dirname, isdir, basename
-from os import devnull, mkdir, chmod, listdir, stat, remove
+from os import devnull, mkdir, chmod, listdir, remove
 from imghdr import what
 from stat import S_IRWXU, S_IRGRP
 from sys import argv, exit
@@ -16,6 +16,7 @@ from time import sleep
 from Tkinter import *
 from tkFileDialog import askdirectory
 from PIL import ImageTk as PIL_ImageTk, Image as PIL_Image
+from os import getuid
 
 
 PATH = dirname(realpath(__file__)) + "/"
@@ -61,6 +62,35 @@ Terminal=false""".format(PATH)
     return True
 
 
+class USBCamera(object):
+    def __init__(self, mountdir):
+        while not mountdir.endswith("%5D"):
+            mountdir = mountdir[:-1]
+        self.mountdir = mountdir
+        self.usbdev = self.mountdir.split("%3A")[-1].split("%2C")[0]
+        self.usbnum = self.mountdir.split("%2C")[-1].split("%5D")[0]
+        self.mount()
+
+    def unmount(self):
+        cmd = ["gvfs-mount", "-u", "gphoto2://[usb:{0},{1}]".format(self.usbdev, self.usbnum)]
+        with open(devnull, "wb") as dNull:
+            success = call(cmd, stderr=dNull, stdout=dNull) == 0
+        return success
+
+    def mount(self):
+        cmd = ["gvfs-mount", "-d", "/dev/bus/usb/{0}/{1}".format(self.usbdev, self.usbnum)]
+        with open(devnull, "wb") as dNull:
+            success = call(cmd, stderr=dNull, stdout=dNull) == 0
+        return success
+
+    def remount(self):
+        self.unmount()
+        sleep(.1)
+        if not self.mount():
+            return False
+        return True
+
+
 class SettingsWindow(object):
     def __init__(self, settings=None):
         def ok():
@@ -91,9 +121,77 @@ class SettingsWindow(object):
             if dname:
                 self.buttonLocDirText.set(dname)
 
+        def chooseUsbCamDir():
+            initDir = "/run/user/{0}/gvfs".format(getuid())
+            dname = askdirectory(initialdir=initDir)
+            if dname:
+                self.entryRemDirText.set(dname)
+
         def close():
             self.tk.destroy()
             exit(0)
+
+        def wifiUsbUpdateEvent(event):
+            if self.settings.verbindungsart != self.dropWifiUsbText:
+                self.settings.verbindungsart = self.dropWifiUsbText.get()
+            buildFrame()
+
+        def buildFrame():
+            self.showFrame.destroy()
+            self.showFrame = Frame(self.tk)
+            self.showFrame.pack()
+
+            # WIFI oder USB
+            self.labelWifiUsb = Label(self.showFrame, text="Verbindungsart:")
+            self.labelWifiUsb.grid(row=0, column=0, sticky=W)
+            self.dropWifiUsbText = StringVar(self.showFrame, self.settings.verbindungsart)
+            self.dropWifiUsb = OptionMenu(self.showFrame, self.dropWifiUsbText, "Wifi", "USB",
+                                          command=wifiUsbUpdateEvent)
+            self.dropWifiUsb.grid(row=0, column=1, sticky=W)
+
+            # Remoteordnereingabe
+            self.labelRemDir = Label(self.showFrame, text="Kameraordner:")
+            self.labelRemDir.grid(row=1, column=0, sticky=W)
+            self.entryRemDirText = StringVar(self.showFrame, self.settings.remoteOrdner)
+            if self.settings.verbindungsart == "Wifi":
+                self.entryRemDir = Entry(self.showFrame, relief=SUNKEN, textvariable=self.entryRemDirText)
+            elif self.settings.verbindungsart == "USB":
+                self.entryRemDir = Button(self.showFrame, textvariable=self.entryRemDirText, command=chooseUsbCamDir)
+            self.entryRemDir.grid(row=1, column=1, sticky=W)
+
+            # Lokalordnerauswahl
+            self.labelLocDir = Label(self.showFrame, text="Bilderordner:")
+            self.labelLocDir.grid(row=2, column=0, sticky=W)
+            self.buttonLocDirText = StringVar(self.showFrame, self.settings.lokalOrdner)
+            self.buttonLocDir = Button(self.showFrame, textvariable=self.buttonLocDirText, command=chooseLocDir)
+            self.buttonLocDir.grid(row=2, column=1, sticky=W)
+
+            # Anzeigedauer
+            self.labelImgDur = Label(self.showFrame, text="Anzeigedauer (s):")
+            self.labelImgDur.grid(row=3, column=0, sticky=W)
+            self.dropImgDurInt = IntVar(self.showFrame, self.settings.anzeigedauerSek)
+            self.dropImgDur = OptionMenu(self.showFrame, self.dropImgDurInt, 5, 10, 20, 30, 45, 60)
+            self.dropImgDur.grid(row=3, column=1, sticky=W)
+
+            # Anzeigeverzögerung
+            self.labelImgDelay = Label(self.showFrame, text="Downloadverzögerung (m):")
+            self.labelImgDelay.grid(row=4, column=0, sticky=W)
+            self.dropImgDelayInt = IntVar(self.showFrame, self.settings.downloadVerzoegerungMin)
+            self.dropImgDelay = OptionMenu(self.showFrame, self.dropImgDelayInt, 0, 1, 2, 3, 5, 10)
+            self.dropImgDelay.grid(row=4, column=1, sticky=W)
+
+            # Logging
+            self.labelLog = Label(self.showFrame, text="Loggen:")
+            self.labelLog.grid(row=5, column=0, sticky=W)
+            if self.settings.logging:
+                s = "Ja"
+            else:
+                s = "Nein"
+            self.dropLogText = StringVar(self.showFrame, s)
+            self.dropLog = OptionMenu(self.showFrame, self.dropLogText, "Ja", "Nein")
+            self.dropLog.grid(row=5, column=1, sticky=W)
+
+            self.buttonOK = Button(self.showFrame, text="OK", command=ok).grid(row=6, column=1, sticky=E)
 
         if settings is None:
             self.settings = Einstellungen.get()
@@ -107,46 +205,9 @@ class SettingsWindow(object):
         self.icon = PIL_ImageTk.PhotoImage(icon)
         self.tk.tk.call("wm", "iconphoto", self.tk._w, self.icon)
 
-        # Remoteordnereingabe
-        self.labelRemDir = Label(self.tk, text="Kameraordner:")
-        self.labelRemDir.grid(row=0, column=0, sticky=W)
-        self.entryRemDirText = StringVar(self.tk, self.settings.remoteOrdner)
-        self.entryRemDir = Entry(self.tk, relief=SUNKEN, textvariable=self.entryRemDirText)
-        self.entryRemDir.grid(row=0, column=1, sticky=W)
+        self.showFrame = Frame(self.tk)
 
-        # Lokalordnerauswahl
-        self.labelLocDir = Label(self.tk, text="Bilderordner:")
-        self.labelLocDir.grid(row=1, column=0, sticky=W)
-        self.buttonLocDirText = StringVar(self.tk, self.settings.lokalOrdner)
-        self.buttonLocDir = Button(self.tk, textvariable=self.buttonLocDirText, command=chooseLocDir)
-        self.buttonLocDir.grid(row=1, column=1, sticky=W)
-
-        # Anzeigedauer
-        self.labelImgDur = Label(self.tk, text="Anzeigedauer (s):")
-        self.labelImgDur.grid(row=2, column=0, sticky=W)
-        self.dropImgDurInt = IntVar(self.tk, self.settings.anzeigedauerSek)
-        self.dropImgDur = OptionMenu(self.tk, self.dropImgDurInt, 5, 10, 20, 30, 45, 60)
-        self.dropImgDur.grid(row=2, column=1, sticky=W)
-
-        # Anzeigeverzögerung
-        self.labelImgDelay = Label(self.tk, text="Downloadverzögerung (m):")
-        self.labelImgDelay.grid(row=3, column=0, sticky=W)
-        self.dropImgDelayInt = IntVar(self.tk, self.settings.downloadVerzoegerungMin)
-        self.dropImgDelay = OptionMenu(self.tk, self.dropImgDelayInt, 0, 1, 2, 3, 5, 10)
-        self.dropImgDelay.grid(row=3, column=1, sticky=W)
-
-        # Logging
-        self.labelLog = Label(self.tk, text="Loggen:")
-        self.labelLog.grid(row=4, column=0, sticky=W)
-        if self.settings.logging:
-            s = "Ja"
-        else:
-            s = "Nein"
-        self.dropLogText = StringVar(self.tk, s)
-        self.dropLog = OptionMenu(self.tk, self.dropLogText, "Ja", "Nein")
-        self.dropLog.grid(row=4, column=1, sticky=W)
-
-        self.buttonOK = Button(self.tk, text="OK", command=ok).grid(row=5, column=1, sticky=E)
+        buildFrame()
 
         self.tk.mainloop()
 
@@ -196,9 +257,12 @@ class Syncer(Thread):
         if Syncer.CONNECTED:
             while remoteOrdner.startswith("/"):
                 remoteOrdner = remoteOrdner[1:]
+
+            # weil Fotos wegen eventueller Duplikate eine Nummer angehängt bekommen...
             endung = "." + foto.lokalPfad.rsplit(".", 1)[-1]
             bName = foto.lokalPfad.rsplit("_", 1)[0]
             testRemotePfad = Syncer.CAM_URL + remoteOrdner + "/" + basename(bName + endung)
+
             if urlopen(testRemotePfad, timeout=5).geturl() == testRemotePfad:
                 remoteFotos = Syncer.getRemoteFotos(remoteOrdner)
                 testDict = {f.remotePfad: f for f in remoteFotos}
@@ -236,7 +300,7 @@ class Syncer(Thread):
                 fp = settings.lokalOrdner + "/" + f
                 if (fp not in bekannt) and (not isdir(fp)):
                     if what(fp) in Foto.SUPPORTED:
-                        fn = Foto.konvertiereLokal(stat(fp), fp)
+                        fn = Foto.konvertiereLokal(fp)
                         fn.speichern()
                         printf("Neues Foto (nicht heruntergeladen) erkannt:\n\t"
                                "id: {0}\n\tPfad{1}".format(fn.id, fn.lokalPfad))
@@ -306,7 +370,7 @@ class Syncer(Thread):
 
                 for f in remoteFotos:
                     # Foto ist noch nicht in der Datenbank.
-                    if not (f.getIdentifier() in fIds):
+                    if f.getIdentifier() not in fIds:
                         if f.aufnDatum + timedelta(minutes=self.settings.downloadVerzoegerungMin) < datetime.today():
                             if f.download(self.settings.lokalOrdner):
                                 # Foto bei erfolgreichem Download in die Datenbank speichern und versuchen,
@@ -327,6 +391,167 @@ class Syncer(Thread):
             Syncer.syncFotoDateien(self.settings)
             sleep(5)
         printf("Syncer beendet.")
+        self.isRunning = False
+
+
+class USBSyncer(Thread):
+    CONNECTED = False
+
+    def __init__(self, settings, usbCamera):
+        super(USBSyncer, self).__init__()
+        self.daemon = True
+        self.settings = settings
+        self.quit = False
+        self.isRunning = False
+        self.usbCam = usbCamera
+        printf("USBSyncer initialisiert.")
+
+    def quitThread(self):
+        self.quit = True
+
+    @staticmethod
+    def getRemoteFotos(remoteOrdner):
+        try:
+            remoteFotoPfade = [p for p in listdir(remoteOrdner) if p != ""]
+        except OSError as e:
+            if e.errno == 5:
+                return []
+            else:
+                raise
+        remoteFotos = [Foto.konvertiereUSBRemote(remoteOrdner + "/" + p) for p in remoteFotoPfade]
+        return remoteFotos
+
+    @staticmethod
+    def versucheRecover(remoteOrdner, foto):
+        if USBSyncer.CONNECTED:
+            while remoteOrdner.startswith("/"):
+                remoteOrdner = remoteOrdner[1:]
+
+            # weil Fotos wegen eventueller Duplikate eine Nummer angehängt bekommen...
+            endung = "." + foto.lokalPfad.rsplit(".", 1)[-1]
+            bName = foto.lokalPfad.rsplit("_", 1)[0]
+            testRemotePfad = Syncer.CAM_URL + remoteOrdner + "/" + basename(bName + endung)
+
+            if urlopen(testRemotePfad, timeout=5).geturl() == testRemotePfad:
+                remoteFotos = USBSyncer.getRemoteFotos(remoteOrdner)
+                testDict = {f.remotePfad: f for f in remoteFotos}
+                try:
+                    if testDict[testRemotePfad].size == foto.size:
+                        foto.remotePfad = testRemotePfad
+                        foto.speichern()
+                except:
+                    return False
+                else:
+                    return True
+            else:
+                return False
+        else:
+            return False
+
+    @staticmethod
+    def syncFotoDateien(settings):
+        try:
+            bekannt = []
+            for f in Foto.alleLaden():
+                bekannt.append(f.lokalPfad)
+                try:
+                    open(f.lokalPfad, "rb").close()
+                except IOError:
+                    printf("Datenbankeintrag wird gelöscht:\n\tid: {0}\n\tPfad: {1}\n\t"
+                           "Grund: Fotodatei konnte nicht geöffnet werden.".format(f.id, f.lokalPfad))
+                    f.loeschen()
+                else:
+                    if settings.lokalOrdner != dirname(f.lokalPfad):
+                        printf("Datenbankeintrag wird gelöscht:\n\tid: {0}\n\tPfad: {1}\n\t"
+                               "Grund: Foto ist nicht im aktuellen Bilderordner.".format(f.id, f.lokalPfad))
+                        f.loeschen()
+            for f in listdir(settings.lokalOrdner):
+                fp = settings.lokalOrdner + "/" + f
+                if (fp not in bekannt) and (not isdir(fp)):
+                    if what(fp) in Foto.SUPPORTED:
+                        fn = Foto.konvertiereLokal(fp)
+                        fn.speichern()
+                        printf("Neues Foto (nicht heruntergeladen) erkannt:\n\t"
+                               "id: {0}\n\tPfad{1}".format(fn.id, fn.lokalPfad))
+                    else:
+                        try:
+                            remove(fp)
+                            printf("Nicht unterstützte Datei aus Bilderordner gelöscht:\n\t{0}".format(fp))
+                        except IOError:
+                            printf("Nicht unterstützte Datei konnte nicht gelöscht werden:\n\t{0}".format(fp))
+            if USBSyncer.CONNECTED:
+                for f in Foto.ladeRemote():
+                    try:
+                        remove(f.remotePfad)
+                        f.istRemote = False
+                        f.speichern()
+                        printf("Remotedatei wurde gelöscht:\n\t{0}".format(f.remotePfad))
+                    except OSError as e:
+                        if e.errno == 2:
+                            f.istRemote = False
+                            f.speichern()
+                            printf("Remotedatei konnte nicht gefunden werden, wurde offenbar "
+                                   "zwischenzeitlich gelöscht:\n\t{0}".format(f.remotePfad))
+                    except IOError:
+                        printf("Remotedatei konnte nicht gelöscht werden:\n\t{0}".format(f.remotePfad))
+            for f in Foto.ladeOhneRemote():
+                if Syncer.versucheRecover(settings.remoteOrdner, f):
+                    printf("Lokale Datei anhand von Name und Größe auf USB-Kamera identifiziert:\n\t{0}\n\t"
+                           "Wird zum Löschen markiert.".format(f.lokalPfad))
+                    fn = Foto.laden(f.id)
+                    fn.istRemote = True
+                    fn.speichern()
+        except Exception as e:
+            printf("Unerwarteter Fehler in Methode USBSyncer.syncFotoDateien:\n{0}\n".format(e))
+
+    def run(self):
+        self.isRunning = True
+        printf("USBSyncer gestartet.")
+        while not self.quit:
+            while not self.usbCam.remount():
+                printf("Kein Verbindung zu USB-Kamera möglich. Wurde die Kamera zwischenzeitlich physisch "
+                       "getrennt oder neu gestartet? --> Programmneustart empfohlen.")
+                USBSyncer.CONNECTED = False
+                sleep(5)
+            LOCK.acquire()
+            if not USBSyncer.CONNECTED:
+                USBSyncer.CONNECTED = True
+                printf("Verbindung zur USB-Kamera hergestellt.")
+            LOCK.release()
+            try:
+                # Identifier ist eine Kombination aus Aufnahmedatum und Remotepfad einer Fotodatei.
+                # Es wird davon ausgegangen, dass nicht innerhalb von zwei Sekunden zwei Dateien
+                # mit demselben Namen in der Kamera erstellt werden.
+                identifierDict = Foto.ladeAlleIdentifier()
+                fIds = identifierDict.keys()
+
+                # Heruntergeladene Informationen in Foto-Objekt konvertieren.
+                remoteFotos = USBSyncer.getRemoteFotos(self.settings.remoteOrdner)
+
+                for f in remoteFotos:
+                    # Foto ist noch nicht in der Datenbank.
+                    if f.getIdentifier() not in fIds:
+                        print f.aufnDatum
+                        if f.aufnDatum + timedelta(minutes=self.settings.downloadVerzoegerungMin) < datetime.today():
+                            if f.download(self.settings.lokalOrdner, "usb"):
+                                # Foto bei erfolgreichem Download in die Datenbank speichern und versuchen,
+                                # es von der USB-Kamera zu löschen.
+                                f.speichern()
+                                printf("Neues Foto heruntergeladen und zum Löschen markiert:\n\t{0}"
+                                       .format(f.lokalPfad))
+                            else:
+                                printf("Foto konnte nicht heruntergeladen werden:\n\t{0}".format(f.remotePfad))
+                    # Foto ist bereits in der Datenbank, bug Canon || FlashAir; erneut zum Löschen markieren
+                    else:
+                        fDb = Foto.laden(identifierDict[f.getIdentifier()])
+                        fDb.istRemote = True
+                        fDb.speichern()
+                        printf("Foto wurde erneut zum Löschen markiert:\n\t{0}".format(f.remotePfad))
+            except Exception as e:
+                printf("Unerwarteter Fehler in USBSyncer.run:\n\t{0}".format(e))
+            USBSyncer.syncFotoDateien(self.settings)
+            sleep(5)
+        printf("USBSyncer beendet.")
         self.isRunning = False
 
 
@@ -489,8 +714,12 @@ class Main(object):
             printf("Unerwarteter Fehler in SettingsWindow:\n{0}\n".format(e))
             raise
         self.settings = Einstellungen.get()
-        Syncer.syncFotoDateien(self.settings)
-        self.syncer = Syncer(self.settings)
+        if self.settings.verbindungsart == "Wifi":
+            Syncer.syncFotoDateien(self.settings)
+            self.syncer = Syncer(self.settings)
+        elif self.settings.verbindungsart == "USB":
+            USBSyncer.syncFotoDateien(self.settings)
+            self.syncer = USBSyncer(self.settings, USBCamera(self.settings.remoteOrdner))
         self.syncer.start()
 
         self.imageViewer = ImageViewer()
