@@ -1,4 +1,4 @@
-Fotobox Version 0.4
+Fotobox Version 0.5
 
 Funktion:
 	- lädt bei bestehender Verbindung zu flashair Fotos vom
